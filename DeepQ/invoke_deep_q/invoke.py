@@ -255,11 +255,12 @@ class QLearn():
     
     '''
     DenseObjectMatrix2D s_t_batch = new DenseObjectMatrix2D(2,0);
-    DenseObjectMatrix1D s_t_segments_batch = new DenseObjectMatrix1D(0);
+    DenseObjectMatrix1D s_t_segment_batch = new DenseObjectMatrix1D(0);
     DenseObjectMatrix2D a_t_batch = new DenseObjectMatrix2D(2,0);
+    DenseObjectMatrix1D a_t_segment_batch = new DenseObjectMatrix1D(0);
     DenseObjectMatrix1D r_t_batch = new DenseObjectMatrix1D(0);
     DenseObjectMatrix2D s_t_1_batch = new DenseObjectMatrix2D(2,0);
-    DenseObjectMatrix1D s_t_1_segments_batch = new DenseObjectMatrix1D(0);
+    DenseObjectMatrix1D s_t_1_segment_batch = new DenseObjectMatrix1D(0);
     DenseObjectMatrix2D s_t_1_actions_batch = new DenseObjectMatrix2D(2,0);
     DenseObjectMatrix1D s_t_1_actions_segment_batch = new DenseObjectMatrix1D(0);
     '''
