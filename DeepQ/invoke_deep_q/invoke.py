@@ -265,15 +265,15 @@ class QLearn():
     DenseObjectMatrix1D s_t_1_actions_segment_batch = new DenseObjectMatrix1D(0);
     '''
     
-    self.s_t_batch = tf.placeholder(int_type, [2, None])
-    self.s_t_segment_batch = tf.placeholder(int_type, [None])
-    self.a_t_batch = tf.placeholder(int_type, [2, None])
-    self.a_t_segment_batch = tf.placeholder(int_type, [2, None])
-    self.r_t_batch = tf.placeholder(float_type, [None])
-    self.s_t_1_batch = tf.placeholder(int_type, [2, None])
-    self.s_t_1_segment_batch = tf.placeholder(int_type, [None])
-    self.s_t_1_actions_batch = tf.placeholder(int_type, [2, None])
-    self.s_t_1_actions_segment_batch = tf.placeholder(int_type, [None])
+    self.s_t_batch = tf.placeholder(int_type, [2, None], "s_t_batch")
+    self.s_t_segment_batch = tf.placeholder(int_type, [None], "s_t_segment_batch")
+    self.a_t_batch = tf.placeholder(int_type, [2, None], "a_t_batch")
+    self.a_t_segment_batch = tf.placeholder(int_type, [2, None], "a_t_segment_batch")
+    self.r_t_batch = tf.placeholder(float_type, [None], "r_t_batch")
+    self.s_t_1_batch = tf.placeholder(int_type, [2, None], "s_t_1_batch")
+    self.s_t_1_segment_batch = tf.placeholder(int_type, [None], "s_t_1_segment_batch")
+    self.s_t_1_actions_batch = tf.placeholder(int_type, [2, None], "s_t_1_actions_batch")
+    self.s_t_1_actions_segment_batch = tf.placeholder(int_type, [None], "s_t_1_actions_segment_batch")
   
   def learning(self):
     s_t_1_embed_batch, a_t_1_embed_batch, a_t_1_embed_segment_batch = self.embed_computer.compute_states_actions_embed(self.s_t_1_batch, self.s_t_1_segment_batch, self.s_t_1_actions_batch, self.s_t_1_actions_segment_batch)
