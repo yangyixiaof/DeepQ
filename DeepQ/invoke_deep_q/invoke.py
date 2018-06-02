@@ -21,7 +21,7 @@ def variable_initialize():
     '''
     parameters to compute embeds
     '''
-    tf.get_variable("embeds_var", shape=[API_Maximum_Number, 1, num_units])
+    tf.get_variable("embeds_var", shape=[API_Maximum_Number, num_units])
     tf.get_variable("embed_w", shape=[num_units, num_units])
     tf.get_variable("embed_action_w", shape=[num_units, num_units])
     tf.get_variable("embed_action_up_down_w", shape=[2*num_units, num_units])
@@ -96,10 +96,11 @@ class EmbedComputer():
       return tf.less(d, d_len)
     
     def iterate_denpency_body(d, d_len, one_stmt_embed, output_embed):
-      one_embed = tf.cond(tf.equal(compute_tensor[1][d], tf.constant(0, int_type)), lambda: output_embed(compute_tensor[0][d]), lambda: embeds_var[compute_tensor[0][d]])
+      one_embed = tf.cond(tf.equal(compute_tensor[1][d], tf.constant(0, int_type)), lambda: output_embed[compute_tensor[0][d]], lambda: embeds_var[compute_tensor[0][d]])
+      one_embed = tf.expand_dims(one_embed, axis=0)
       one_stmt_embed = tf.tanh(tf.add(tf.matmul(one_embed, embed_w), one_stmt_embed))
       d = d+1
-      one_stmt_embed, output_embed = tf.cond(tf.less(d, d_len), lambda: tf.cond(tf.equal(compute_tensor[1][d], tf.constant(2, int_type), lambda: self.sequence_part_over(one_stmt_embed, output_embed), lambda: (one_stmt_embed, output_embed)), lambda: self.sequence_part_over(one_stmt_embed, output_embed)))
+      one_stmt_embed, output_embed = tf.cond(tf.less(d, d_len), lambda: tf.cond(tf.equal(compute_tensor[1][d], tf.constant(2, int_type)), lambda: self.sequence_part_over(one_stmt_embed, output_embed), lambda: (one_stmt_embed, output_embed)), lambda: self.sequence_part_over(one_stmt_embed, output_embed))
       return d, d_len, one_stmt_embed, output_embed
     
     d = tf.constant(0, int_type)
@@ -125,7 +126,7 @@ class EmbedComputer():
     
   def compute_action_embed(self, state_embed, compute_tensor):
   #   compute_tensor = tf.placeholder(int_type, [2, None], "compute_action_tensor")
-    total_embed = state_embed[-1]
+    total_embed = tf.expand_dims(state_embed[-1], axis=0)
     
     def compute_embed_cond(i, i_len, *_):
       return tf.less(i, i_len)
@@ -143,13 +144,13 @@ class EmbedComputer():
       flg = compute_tensor[1][i]
       
       def handle_statement_index():
-        one_up_embed = tf.cond(tf.greater(sig, tf.constant(0, int_type), lambda: state_embed[sig-1], lambda: tf.zeros([1, num_units], float_type)))
+        one_up_embed = tf.cond(tf.greater(sig, tf.constant(0, int_type), lambda: tf.expand_dims(state_embed[sig-1], axis=0), lambda: tf.zeros([1, num_units], float_type)))
         one_down_embed = total_embed-one_up_embed
         to_compute_embed = tf.concat([one_up_embed, one_down_embed], axis=1)
         return tf.matmul(to_compute_embed, embed_action_up_down_w)
       
       def handle_reference_or_elements():
-        return tf.cond(tf.equal(flg, tf.constant(0, int_type)), lambda: state_embed[sig], lambda: embeds_var[sig])
+        return tf.cond(tf.equal(flg, tf.constant(0, int_type)), lambda: tf.expand_dims(state_embed[sig], axis=0), lambda: tf.expand_dims(embeds_var[sig], axis=0))
       
       one_embed = tf.cond(tf.equal(flg, tf.constant(2, int_type)), handle_statement_index, lambda: handle_reference_or_elements)
       one_act_embed = tf.tanh(tf.add(tf.matmul(one_embed, embed_action_w), one_act_embed))
