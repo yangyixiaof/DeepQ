@@ -63,9 +63,9 @@ class EmbedComputer():
       a_range_end = a_segment_batch[i]
       one_s_acts = tf.slice(a_batch, [0, a_range_start], [2, (a_range_end-a_range_start)])
       one_s_acts_embed = self.compute_action_embed(one_s_embed, one_s_acts)
-      a_embed_segment_batch = tf.concat([a_embed_segment_batch, one_s_acts_embed], axis=0)
+      a_embed_batch = tf.concat([a_embed_batch, one_s_acts_embed], axis=0)
       a_embed_segment_start = tf.cond(tf.equal(i, tf.constant(0, int_type)), lambda: tf.constant(0, int_type), lambda: a_embed_segment_batch[i-1])
-      a_embed_segment_batch = tf.concat([a_embed_segment_batch, a_embed_segment_start + tf.shape(one_s_acts_embed)[0]], axis=0)
+      a_embed_segment_batch = tf.concat([a_embed_segment_batch, [a_embed_segment_start + tf.shape(one_s_acts_embed)[0]]], axis=0)
       return i+1, i_len, s_embed_batch, a_embed_batch, a_embed_segment_batch
     
     i = tf.constant(0, int_type)
@@ -203,6 +203,7 @@ class DeepQ():
       w2 = tf.get_variable(self.prefix + "fusion2")
     q_val_batch_im = tf.matmul(q_input, w1)
     q_val_batch = tf.matmul(q_val_batch_im, w2)
+    q_val_batch = tf.squeeze(q_val_batch, axis=[1])
     return q_val_batch
     
 #   def compute_q_value(self):
@@ -225,7 +226,7 @@ class DeepQ():
     def select_action(x):
       start, end = x
       part = tf.slice(q_val_batch, [start], [end-start])
-      return start+tf.arg_max(part)
+      return start+tf.argmax(part, axis=0, output_type=int_type)
     
     start_a_segment_batch = tf.concat([[0], tf.slice(a_segment_batch, [0], [tf.shape(a_segment_batch)[-1]-1])], axis=0)
     selected_actions = tf.map_fn(select_action, [start_a_segment_batch, a_segment_batch], (int_type))
@@ -250,6 +251,7 @@ class DeepQ():
 class QLearn():
   
   def __init__(self, action_value, target_action_value):
+    self.adam = tf.train.AdamOptimizer()
     self.embed_computer = EmbedComputer()
     self.action_value = action_value
     self.target_action_value = target_action_value
@@ -288,9 +290,9 @@ class QLearn():
     
     s_t_embed_batch, a_t_embed_batch, a_t_embed_segment_batch = self.embed_computer.compute_states_actions_embed(self.s_t_batch, self.s_t_segment_batch, self.a_t_batch, self.a_t_segment_batch)
     action_value_q_vals = self.action_value.compute_q_value(s_t_embed_batch, a_t_embed_batch, a_t_embed_segment_batch)
-    
-    self.loss = tf.losses.mean_squared_error(y_batch, action_value_q_vals, "q_learning_loss")
-    self.train = self.adam.minimize(self.loss, "q_learning_train")
+    self.loss = tf.reduce_sum(tf.squared_difference(y_batch, action_value_q_vals), name="q_learning_loss")
+#     tf.losses.mean_squared_error()
+    self.train = self.adam.minimize(self.loss, name="q_learning_train")
     
   def get_output_node_names(self):
     return ["q_learning_loss", "q_learning_train"]
@@ -313,6 +315,7 @@ if __name__ == '__main__':
 #     output_node_names = output_node_names + action_value.get_output_node_names()
 #     output_node_names = output_node_names + target_action_value.get_output_node_names()
     output_node_names = output_node_names + q_learn.get_output_node_names()
+    sess.run(tf.global_variables_initializer())
     output_graph_def = tf.graph_util.convert_variables_to_constants(sess, sess.graph_def, output_node_names=output_node_names)
     with tf.gfile.FastGFile('refined_deep_q.pb', mode='wb') as f:
       f.write(output_graph_def.SerializeToString())
