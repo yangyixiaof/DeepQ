@@ -144,7 +144,7 @@ class EmbedComputer():
       flg = compute_tensor[1][i]
       
       def handle_statement_index():
-        one_up_embed = tf.cond(tf.greater(sig, tf.constant(0, int_type), lambda: tf.expand_dims(state_embed[sig-1], axis=0), lambda: tf.zeros([1, num_units], float_type)))
+        one_up_embed = tf.cond(tf.greater(sig, tf.constant(0, int_type)), lambda: tf.expand_dims(state_embed[sig-1], axis=0), lambda: tf.zeros([1, num_units], float_type))
         one_down_embed = total_embed-one_up_embed
         to_compute_embed = tf.concat([one_up_embed, one_down_embed], axis=1)
         return tf.matmul(to_compute_embed, embed_action_up_down_w)
@@ -152,11 +152,11 @@ class EmbedComputer():
       def handle_reference_or_elements():
         return tf.cond(tf.equal(flg, tf.constant(0, int_type)), lambda: tf.expand_dims(state_embed[sig], axis=0), lambda: tf.expand_dims(embeds_var[sig], axis=0))
       
-      one_embed = tf.cond(tf.equal(flg, tf.constant(2, int_type)), handle_statement_index, lambda: handle_reference_or_elements)
+      one_embed = tf.cond(tf.equal(flg, tf.constant(2, int_type)), handle_statement_index, handle_reference_or_elements)
       one_act_embed = tf.tanh(tf.add(tf.matmul(one_embed, embed_action_w), one_act_embed))
       
       i = i+1
-      one_act_embed, output_embed = tf.cond(tf.less(i, i_len), lambda: tf.cond(tf.equal(compute_tensor[1][i], tf.constant(2, int_type), lambda: self.sequence_part_over(one_act_embed, output_embed), lambda: (one_act_embed, output_embed)), lambda: self.sequence_part_over(one_act_embed, output_embed)))
+      one_act_embed, output_embed = tf.cond(tf.less(i, i_len), lambda: tf.cond(tf.equal(compute_tensor[1][i], tf.constant(2, int_type)), lambda: self.sequence_part_over(one_act_embed, output_embed), lambda: (one_act_embed, output_embed)), lambda: self.sequence_part_over(one_act_embed, output_embed))
       return i, i_len, one_act_embed, output_embed
     
     i = tf.constant(0, int_type)
