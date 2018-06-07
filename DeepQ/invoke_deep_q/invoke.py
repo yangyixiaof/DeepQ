@@ -1,9 +1,9 @@
+import json
+import socket
+
 import tensorflow as tf
 
 
-'''
-hyper parameters
-'''
 gamma = 0.9
 num_units = 128
 bool_type = tf.bool
@@ -250,11 +250,12 @@ class DeepQ():
 
 class QLearn():
   
-  def __init__(self, action_value, target_action_value):
-    self.adam = tf.train.AdamOptimizer()
-    self.embed_computer = EmbedComputer()
+  def __init__(self, sess, action_value, target_action_value):
+    self.sess = sess
     self.action_value = action_value
     self.target_action_value = target_action_value
+    self.adam = tf.train.AdamOptimizer()
+    self.embed_computer = EmbedComputer()
     
     '''
     DenseObjectMatrix2D s_t_batch = new DenseObjectMatrix2D(2,0);
@@ -277,6 +278,14 @@ class QLearn():
     self.s_t_1_segment_batch = tf.placeholder(int_type, [None], "s_t_1_segment_batch")
     self.s_t_1_actions_batch = tf.placeholder(int_type, [2, None], "s_t_1_actions_batch")
     self.s_t_1_actions_segment_batch = tf.placeholder(int_type, [None], "s_t_1_actions_segment_batch")
+    
+  def predicting(self):
+    # TODO
+    pass
+  
+  def predicting_with_input(self, input_data):
+    # TODO
+    pass
   
   def learning(self):
     s_t_1_embed_batch, a_t_1_embed_batch, a_t_1_embed_segment_batch = self.embed_computer.compute_states_actions_embed(self.s_t_1_batch, self.s_t_1_segment_batch, self.s_t_1_actions_batch, self.s_t_1_actions_segment_batch)
@@ -294,8 +303,33 @@ class QLearn():
 #     tf.losses.mean_squared_error()
     self.train = self.adam.minimize(self.loss, name="q_learning_train")
     
-  def get_output_node_names(self):
-    return ["q_learning_loss", "q_learning_train"]
+  def learning_with_input(self, input_data):
+    feed_dict = {
+      self.s_t_batch : input_data["s_t_batch"],
+      self.s_t_segment_batch : input_data["s_t_segment_batch"],
+      self.a_t_batch : input_data["a_t_batch"],
+      self.a_t_segment_batch : input_data["a_t_segment_batch"],
+      self.r_t_batch : input_data["r_t_batch"],
+      self.s_t_1_batch : input_data["s_t_1_batch"],
+      self.s_t_1_segment_batch : input_data["s_t_1_segment_batch"],
+      self.s_t_1_actions_batch : input_data["s_t_1_actions_batch"],
+      self.s_t_1_actions_segment_batch : input_data["s_t_1_actions_segment_batch"],
+    }
+    loss_val, _ = self.sess.run([self.loss, self.train], feed_dict=feed_dict)
+    return loss_val
+    
+#   def get_output_node_names(self):
+#     return ["q_learning_loss", "q_learning_train"]
+  
+
+def recv_basic(the_socket):
+  total_data=[]
+  while True:
+    data = the_socket.recv(1024)    
+    if not data: break
+    total_data.append(data)
+  return ''.join(total_data)
+  
   
 if __name__ == '__main__':
   with tf.Session() as sess:
@@ -314,11 +348,34 @@ if __name__ == '__main__':
     output_node_names = []
 #     output_node_names = output_node_names + action_value.get_output_node_names()
 #     output_node_names = output_node_names + target_action_value.get_output_node_names()
-    output_node_names = output_node_names + q_learn.get_output_node_names()
+#     output_node_names = output_node_names + q_learn.get_output_node_names()
     sess.run(tf.global_variables_initializer())
-    output_graph_def = tf.graph_util.convert_variables_to_constants(sess, sess.graph_def, output_node_names=output_node_names)
-    with tf.gfile.FastGFile('refined_deep_q.pb', mode='wb') as f:
-      f.write(output_graph_def.SerializeToString())
+#     output_graph_def = tf.graph_util.convert_variables_to_constants(sess, sess.graph_def, output_node_names=output_node_names)
+#     with tf.gfile.FastGFile('refined_deep_q.pb', mode='wb') as f:
+#       f.write(output_graph_def.SerializeToString())
+    address = ('127.0.0.1', 31500)
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # s = socket.socket()
+    s.bind(address)
+    s.listen(5)
+    while True:
+      conn, addr = s.accept()
+      print("Connected by " + str(addr))
+      json_raw_data = recv_basic(conn)
+      if json_raw_data == "stop": break
+      one_data = json.loads(json_raw_data)
+      if "learning" in one_data:
+        r_v = q_learn.learning_with_input(one_data["learning"])
+      else:
+        assert "predicting" in one_data
+        r_v = q_learn.predicting_with_input(one_data["predicting"])
+      '''
+      send running result to Java
+      '''
+      s_c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+      s_c.connect(('127.0.0.1', 41500))
+      s_c.send(json.dumps(r_v))
+      s_c.close()
+    s.close()
   '''
   x: [batch, actions, num_units]
   y: [batch] # index of selected actions
