@@ -340,7 +340,7 @@ if __name__ == '__main__':
     target_action_value = DeepQ(target_action_value_prefix)
 #     target_action_value.compute_q_value()
 #     target_action_value.perform_policy()
-    q_learn = QLearn(action_value, target_action_value)
+    q_learn = QLearn(sess, action_value, target_action_value)
     q_learn.learning()
     '''
     write model to file
