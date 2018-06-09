@@ -272,7 +272,7 @@ class QLearn():
     self.s_t_batch = tf.placeholder(int_type, [2, None], "s_t_batch")
     self.s_t_segment_batch = tf.placeholder(int_type, [None], "s_t_segment_batch")
     self.a_t_batch = tf.placeholder(int_type, [2, None], "a_t_batch")
-    self.a_t_segment_batch = tf.placeholder(int_type, [2, None], "a_t_segment_batch")
+    self.a_t_segment_batch = tf.placeholder(int_type, [None], "a_t_segment_batch")
     self.r_t_batch = tf.placeholder(float_type, [None], "r_t_batch")
     self.s_t_1_batch = tf.placeholder(int_type, [2, None], "s_t_1_batch")
     self.s_t_1_segment_batch = tf.placeholder(int_type, [None], "s_t_1_segment_batch")
@@ -327,8 +327,8 @@ def recv_basic(the_socket):
   while True:
     data = the_socket.recv(1024)    
     if not data: break
-    total_data.append(data)
-  return ''.join(total_data)
+    total_data.extend(list(data))
+  return total_data
   
   
 if __name__ == '__main__':
@@ -361,8 +361,9 @@ if __name__ == '__main__':
       conn, addr = s.accept()
       print("Connected by " + str(addr))
       json_raw_data = recv_basic(conn)
-      if json_raw_data == "stop": break
-      one_data = json.loads(json_raw_data)
+      one_data = json.loads(bytes(json_raw_data))
+      if one_data == "stop": break
+      print("one_data:" + str(one_data))
       if "learning" in one_data:
         r_v = q_learn.learning_with_input(one_data["learning"])
       else:
