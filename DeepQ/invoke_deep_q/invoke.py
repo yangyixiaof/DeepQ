@@ -375,11 +375,14 @@ if __name__ == '__main__':
 #       print("one_data:" + str(one_data))
       
       if "learning" in one_data:
-        r_v = q_learn.learning_with_input(one_data["learning"])
-        print_training_data(one_data["learning"])
+        assert "learning" in one_data
+        one_training_data = one_data["learning"]
+        print_training_data(one_training_data)
+        r_v = q_learn.learning_with_input(one_training_data)
       else:
         assert "predicting" in one_data
-        r_v = q_learn.predicting_with_input(one_data["predicting"])
+        one_predicting_data = one_data["predicting"]
+        r_v = q_learn.predicting_with_input(one_predicting_data)
         
       '''
       send running result to Java
