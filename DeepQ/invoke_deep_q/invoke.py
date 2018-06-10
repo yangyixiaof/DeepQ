@@ -77,12 +77,8 @@ class EmbedComputer():
     return s_embed_batch, a_embed_batch, a_embed_segment_batch
     
   def compute_state_embed(self, compute_tensor):
-#     compute_tensor = tf.placeholder(int_type, [2, None], "compute_state_tensor")
-#     
-#     def compute_embed_cond(i, i_len, _):
-#       return tf.less(i, i_len)
-#       
-#     def compute_embed_body(i, i_len, embeds):
+#     compute_tensor = tf.Print(compute_tensor, [compute_tensor], "compute_tensor")
+    
     with tf.variable_scope(name_or_scope="yyx_q_network", reuse=tf.AUTO_REUSE, dtype=float_type):
       '''
       parameters to compute embeds
@@ -96,6 +92,8 @@ class EmbedComputer():
       return tf.less(d, d_len)
     
     def iterate_denpency_body(d, d_len, one_stmt_embed, output_embed):
+      # TODO
+      output_embed = tf.Print(output_embed, [output_embed, tf.shape(embeds_var), compute_tensor], "output_embed/tf.shape(embeds_var)#in_iterate_denpency_body", summarize=100)
       one_embed = tf.cond(tf.equal(compute_tensor[1][d], tf.constant(0, int_type)), lambda: output_embed[compute_tensor[0][d]], lambda: embeds_var[compute_tensor[0][d]])
       one_embed = tf.expand_dims(one_embed, axis=0)
       one_stmt_embed = tf.tanh(tf.add(tf.matmul(one_embed, embed_w), one_stmt_embed))
@@ -331,6 +329,17 @@ def recv_basic(the_socket):
   return total_data
   
   
+def print_training_data(one_data):
+  print("a_t_batch:" + str(one_data["a_t_batch"]))
+  print("a_t_segment_batch:" + str(one_data["a_t_segment_batch"]))
+  print("r_t_batch:" + str(one_data["r_t_batch"]))
+  print("s_t_1_actions_batch:" + str(one_data["s_t_1_actions_batch"]))
+  print("s_t_1_actions_segment_batch:" + str(one_data["s_t_1_actions_segment_batch"]))
+  print("s_t_1_batch:" + str(one_data["s_t_1_batch"]))
+  print("s_t_1_segment_batch:" + str(one_data["s_t_1_segment_batch"]))
+  print("s_t_segment_batch:" + str(one_data["s_t_segment_batch"]))
+
+  
 if __name__ == '__main__':
   with tf.Session() as sess:
     variable_initialize()
@@ -363,12 +372,15 @@ if __name__ == '__main__':
       json_raw_data = recv_basic(conn)
       one_data = json.loads(bytes(json_raw_data))
       if one_data == "stop": break
-      print("one_data:" + str(one_data))
+#       print("one_data:" + str(one_data))
+      
       if "learning" in one_data:
         r_v = q_learn.learning_with_input(one_data["learning"])
+        print_training_data(one_data["learning"])
       else:
         assert "predicting" in one_data
         r_v = q_learn.predicting_with_input(one_data["predicting"])
+        
       '''
       send running result to Java
       '''
