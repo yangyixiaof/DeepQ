@@ -330,6 +330,8 @@ def recv_basic(the_socket):
   
   
 def print_training_data(one_data):
+  print("s_t_batch:" + str(one_data["s_t_batch"]))
+  print("s_t_segment_batch:" + str(one_data["s_t_segment_batch"]))
   print("a_t_batch:" + str(one_data["a_t_batch"]))
   print("a_t_segment_batch:" + str(one_data["a_t_segment_batch"]))
   print("r_t_batch:" + str(one_data["r_t_batch"]))
@@ -337,7 +339,6 @@ def print_training_data(one_data):
   print("s_t_1_actions_segment_batch:" + str(one_data["s_t_1_actions_segment_batch"]))
   print("s_t_1_batch:" + str(one_data["s_t_1_batch"]))
   print("s_t_1_segment_batch:" + str(one_data["s_t_1_segment_batch"]))
-  print("s_t_segment_batch:" + str(one_data["s_t_segment_batch"]))
 
   
 if __name__ == '__main__':
