@@ -93,8 +93,7 @@ class EmbedComputer():
       return tf.less(d, d_len)
     
     def iterate_denpency_body(d, d_len, one_stmt_embed, output_embed):
-      # TODO
-      output_embed = tf.Print(output_embed, [output_embed, tf.shape(embeds_var), compute_tensor], "output_embed/tf.shape(embeds_var)#in_iterate_denpency_body", summarize=100)
+#       output_embed = tf.Print(output_embed, [output_embed, tf.shape(embeds_var), compute_tensor], "output_embed/tf.shape(embeds_var)#in_iterate_denpency_body", summarize=100)
       one_embed = tf.cond(tf.equal(compute_tensor[1][d], tf.constant(0, int_type)), lambda: output_embed[compute_tensor[0][d]], lambda: embeds_var[compute_tensor[0][d]])
       one_embed = tf.expand_dims(one_embed, axis=0)
       one_stmt_embed = tf.tanh(tf.add(tf.matmul(one_embed, embed_w), one_stmt_embed))
