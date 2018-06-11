@@ -381,18 +381,18 @@ if __name__ == '__main__':
         assert "learning" in one_data
         one_training_data = one_data["learning"]
         print_training_data(one_training_data)
-        r_v = q_learn.learning_with_input(one_training_data)
+        return_v = q_learn.learning_with_input(one_training_data)
       else:
         assert "predicting" in one_data
         one_predicting_data = one_data["predicting"]
-        r_v = q_learn.predicting_with_input(one_predicting_data)
+        return_v = q_learn.predicting_with_input(one_predicting_data)
         
       '''
       send running result to Java
       '''
       s_c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
       s_c.connect(('127.0.0.1', 41500))
-      s_c.send(json.dumps(r_v))
+      s_c.send(json.dumps(return_v).encode())
       s_c.close()
     s.close()
   '''
