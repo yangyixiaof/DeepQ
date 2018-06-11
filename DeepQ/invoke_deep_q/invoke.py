@@ -1,6 +1,7 @@
 import json
 import socket
 
+import numpy as np
 import tensorflow as tf
 
 
@@ -314,7 +315,8 @@ class QLearn():
       self.s_t_1_actions_segment_batch : input_data["s_t_1_actions_segment_batch"],
     }
     loss_val, _ = self.sess.run([self.loss, self.train], feed_dict=feed_dict)
-    return loss_val
+    r_loss_val = np.asscalar(loss_val)
+    return r_loss_val
     
 #   def get_output_node_names(self):
 #     return ["q_learning_loss", "q_learning_train"]
