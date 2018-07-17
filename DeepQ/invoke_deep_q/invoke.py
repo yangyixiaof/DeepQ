@@ -4,7 +4,6 @@ import socket
 import numpy as np
 import tensorflow as tf
 
-
 gamma = 0.9
 num_units = 128
 bool_type = tf.bool
@@ -16,6 +15,8 @@ target_action_value_prefix = "target_"
 
 API_Maximum_Number = 1000
 num_units = 128
+Branch_Maximum_Number = 1000
+
 
 def variable_initialize():
   with tf.variable_scope(name_or_scope="yyx_q_network", reuse=tf.AUTO_REUSE, dtype=float_type):
@@ -25,20 +26,20 @@ def variable_initialize():
     tf.get_variable("embeds_var", shape=[API_Maximum_Number, num_units])
     tf.get_variable("embed_w", shape=[num_units, num_units])
     tf.get_variable("embed_action_w", shape=[num_units, num_units])
-    tf.get_variable("embed_action_up_down_w", shape=[2*num_units, num_units])
+    tf.get_variable("embed_action_up_down_w", shape=[2 * num_units, num_units])
     '''
     parameters to compute q networks
     '''
-    tf.get_variable(action_value_prefix + "fusion1", shape=[2*num_units, num_units])
-    tf.get_variable(action_value_prefix + "fusion2", shape=[num_units, 1])
-    tf.get_variable(target_action_value_prefix + "fusion1", shape=[2*num_units, num_units])
-    tf.get_variable(target_action_value_prefix + "fusion2", shape=[num_units, 1])
+    tf.get_variable(action_value_prefix + "fusion1", shape=[Branch_Maximum_Number, 2 * num_units, num_units])
+    tf.get_variable(action_value_prefix + "fusion2", shape=[Branch_Maximum_Number, num_units, 1])
+    tf.get_variable(target_action_value_prefix + "fusion1", shape=[Branch_Maximum_Number, 2 * num_units, num_units])
+    tf.get_variable(target_action_value_prefix + "fusion2", shape=[Branch_Maximum_Number, num_units, 1])
   
   
 class EmbedComputer():
   
   def __init__(self):
-    pass
+    self.info = "info"
   
   def compute_states_actions_embed(self, s_batch, s_segment_batch, a_batch, a_segment_batch):
   #   s_batch = tf.placeholder(int_type, [2, None])
@@ -54,20 +55,20 @@ class EmbedComputer():
       return tf.less(i, i_len)
           
     def compute_state_actions_body(i, i_len, s_embed_batch, a_embed_batch, a_embed_segment_batch):
-      s_range_start = tf.cond(tf.equal(i, tf.constant(0, int_type)), lambda: tf.constant(0, int_type), lambda: s_segment_batch[i-1])
+      s_range_start = tf.cond(tf.equal(i, tf.constant(0, int_type)), lambda: tf.constant(0, int_type), lambda: s_segment_batch[i - 1])
       s_range_end = s_segment_batch[i]
-      one_s = tf.slice(s_batch, [0, s_range_start], [2, (s_range_end-s_range_start)])
+      one_s = tf.slice(s_batch, [0, s_range_start], [2, (s_range_end - s_range_start)])
       one_s_embed = self.compute_state_embed(one_s)
       s_embed_batch = tf.concat([s_embed_batch, [one_s_embed[-1]]], axis=0)
       
-      a_range_start = tf.cond(tf.equal(i, tf.constant(0, int_type)), lambda: tf.constant(0, int_type), lambda: a_segment_batch[i-1])
+      a_range_start = tf.cond(tf.equal(i, tf.constant(0, int_type)), lambda: tf.constant(0, int_type), lambda: a_segment_batch[i - 1])
       a_range_end = a_segment_batch[i]
-      one_s_acts = tf.slice(a_batch, [0, a_range_start], [2, (a_range_end-a_range_start)])
+      one_s_acts = tf.slice(a_batch, [0, a_range_start], [2, (a_range_end - a_range_start)])
       one_s_acts_embed = self.compute_action_embed(one_s_embed, one_s_acts)
       a_embed_batch = tf.concat([a_embed_batch, one_s_acts_embed], axis=0)
-      a_embed_segment_start = tf.cond(tf.equal(i, tf.constant(0, int_type)), lambda: tf.constant(0, int_type), lambda: a_embed_segment_batch[i-1])
+      a_embed_segment_start = tf.cond(tf.equal(i, tf.constant(0, int_type)), lambda: tf.constant(0, int_type), lambda: a_embed_segment_batch[i - 1])
       a_embed_segment_batch = tf.concat([a_embed_segment_batch, [a_embed_segment_start + tf.shape(one_s_acts_embed)[0]]], axis=0)
-      return i+1, i_len, s_embed_batch, a_embed_batch, a_embed_segment_batch
+      return i + 1, i_len, s_embed_batch, a_embed_batch, a_embed_segment_batch
     
     i = tf.constant(0, int_type)
     i_len = tf.shape(s_segment_batch)[-1]
@@ -97,7 +98,7 @@ class EmbedComputer():
       one_embed = tf.cond(tf.equal(compute_tensor[1][d], tf.constant(0, int_type)), lambda: output_embed[compute_tensor[0][d]], lambda: embeds_var[compute_tensor[0][d]])
       one_embed = tf.expand_dims(one_embed, axis=0)
       one_stmt_embed = tf.tanh(tf.add(tf.matmul(one_embed, embed_w), one_stmt_embed))
-      d = d+1
+      d = d + 1
       one_stmt_embed, output_embed = tf.cond(tf.less(d, d_len), lambda: tf.cond(tf.equal(compute_tensor[1][d], tf.constant(2, int_type)), lambda: self.sequence_part_over(one_stmt_embed, output_embed), lambda: (one_stmt_embed, output_embed)), lambda: self.sequence_part_over(one_stmt_embed, output_embed))
       return d, d_len, one_stmt_embed, output_embed
     
@@ -142,8 +143,8 @@ class EmbedComputer():
       flg = compute_tensor[1][i]
       
       def handle_statement_index():
-        one_up_embed = tf.cond(tf.greater(sig, tf.constant(0, int_type)), lambda: tf.expand_dims(state_embed[sig-1], axis=0), lambda: tf.zeros([1, num_units], float_type))
-        one_down_embed = total_embed-one_up_embed
+        one_up_embed = tf.cond(tf.greater(sig, tf.constant(0, int_type)), lambda: tf.expand_dims(state_embed[sig - 1], axis=0), lambda: tf.zeros([1, num_units], float_type))
+        one_down_embed = total_embed - one_up_embed
         to_compute_embed = tf.concat([one_up_embed, one_down_embed], axis=1)
         return tf.matmul(to_compute_embed, embed_action_up_down_w)
       
@@ -153,7 +154,7 @@ class EmbedComputer():
       one_embed = tf.cond(tf.equal(flg, tf.constant(2, int_type)), handle_statement_index, handle_reference_or_elements)
       one_act_embed = tf.tanh(tf.add(tf.matmul(one_embed, embed_action_w), one_act_embed))
       
-      i = i+1
+      i = i + 1
       one_act_embed, output_embed = tf.cond(tf.less(i, i_len), lambda: tf.cond(tf.equal(compute_tensor[1][i], tf.constant(2, int_type)), lambda: self.sequence_part_over(one_act_embed, output_embed), lambda: (one_act_embed, output_embed)), lambda: self.sequence_part_over(one_act_embed, output_embed))
       return i, i_len, one_act_embed, output_embed
     
@@ -176,39 +177,60 @@ class DeepQ():
 #     self.policy_actions_batch = tf.placeholder(float_type, [None, None, num_units], self.prefix + "policy_a_batch")
 #     self.policy_actions_segment_batch = tf.placeholder(float_type, [None, num_units], self.prefix + "policy_a_segment_batch")
     
-  def compute_q_value(self, s_batch, a_batch, a_segment_batch):
+  def compute_q_value(self, s_batch, a_batch, a_segment_batch, r_branch_id_batch, r_segment_batch):
     
-    def replicate_s_batch_cond(i, i_len, *_):
+    def s_batch_cond(i, i_len, *_):
       return tf.less(i, i_len)
     
-    def replicate_s_batch_body(i, i_len, normalized_s_batch):
-      seg_start = tf.cond(tf.equal(i, tf.constant(0, int_type)), lambda: tf.constant(0, int_type), lambda: a_segment_batch[i-1])
-      seg_end = a_segment_batch[i]
-      seg_length = seg_end - seg_start
-      def replicate_s_batch_map_fn(_):
-        return s_batch[i]
-      part_normalized_s_batch = tf.map_fn(replicate_s_batch_map_fn, [tf.range(0, seg_length)], (float_type))
-      normalized_s_batch = tf.concat([normalized_s_batch, part_normalized_s_batch], axis=0)
-      return i+1, i_len, normalized_s_batch
+    def s_batch_body(i, i_len, a_seg_start, r_seg_start, q_v_batch):
+      s_exmp = s_batch[i]
+      a_seg_end = a_segment_batch[i]
+      r_seg_end = r_segment_batch[i]
+      
+      def a_batch_cond(a, a_len, *_):
+        return tf.less(a, a_len)
+      
+      def a_batch_body(a, a_len, a_q_v_batch):
+        a_exmp = a_batch[a]
+        
+        def r_batch_cond(r, r_len, *_):
+          return tf.less(r, r_len)
+        
+        def r_batch_body(r, r_len, r_q_v_batch):
+          r_exmp_branch_id = tf.cast(r_branch_id_batch[r], int_type)
+#           r_exmp_branch_influence = r_batch[1][r]
+          with tf.variable_scope(name_or_scope="yyx_q_network", reuse=tf.AUTO_REUSE, dtype=float_type):
+            w1 = tf.get_variable(self.prefix + "fusion1")[r_exmp_branch_id]
+            w2 = tf.get_variable(self.prefix + "fusion2")[r_exmp_branch_id]
+          q_val_im = tf.matmul(tf.expand_dims(tf.concat([s_exmp, a_exmp], axis=0), axis=0), w1)
+          q_val = tf.matmul(tf.nn.tanh(q_val_im), w2)
+          q_val = tf.squeeze(tf.nn.tanh(q_val))
+          r_q_v_batch = tf.concat([r_q_v_batch, [q_val]], axis=0)
+          return r+1, r_len, r_q_v_batch
+        
+        r_q_v_batch = tf.zeros([0], float_type)
+        _, _, r_q_v_batch = tf.while_loop(r_batch_cond, r_batch_body, [r_seg_start, r_seg_end, r_q_v_batch], [tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape([None])])
+        a_q_v_batch = tf.concat([a_q_v_batch, r_q_v_batch], axis=0)
+        return a+1, a_len, a_q_v_batch
+      
+      a_q_v_batch = tf.zeros([0], float_type)
+      _, _, a_q_v_batch = tf.while_loop(a_batch_cond, a_batch_body, [a_seg_start, a_seg_end, a_q_v_batch], [tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape([None])])
+      q_v_batch = tf.concat([q_v_batch, a_q_v_batch], axis=0)
+      return i+1, i_len, a_seg_end, r_seg_end, q_v_batch
     
     i = tf.constant(0, int_type)
     i_len = tf.shape(a_segment_batch)[-1]
-    normalized_s_batch = tf.zeros([0, num_units], float_type)
-    _, _, normalized_s_batch = tf.while_loop(replicate_s_batch_cond, replicate_s_batch_body, [i, i_len, normalized_s_batch], [tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape([None, num_units])])
-    q_input = tf.concat([normalized_s_batch, a_batch], axis=1)
-    with tf.variable_scope(name_or_scope="yyx_q_network", reuse=tf.AUTO_REUSE, dtype=float_type):
-      w1 = tf.get_variable(self.prefix + "fusion1")
-      w2 = tf.get_variable(self.prefix + "fusion2")
-    q_val_batch_im = tf.matmul(q_input, w1)
-    q_val_batch = tf.matmul(q_val_batch_im, w2)
-    q_val_batch = tf.squeeze(q_val_batch, axis=[1])
-    return q_val_batch
+    a_seg_start = tf.constant(0, int_type)
+    r_seg_start = tf.constant(0, int_type)
+    q_v_batch = tf.zeros([0], float_type)
+    _, _, _, _, q_v_batch = tf.while_loop(s_batch_cond, s_batch_body, [i, i_len, a_seg_start, r_seg_start, q_v_batch], [tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape([None])])
+    return q_v_batch
     
 #   def compute_q_value(self):
 #     q_val_batch = self.compute_q_value_util(self.s_batch, self.a_batch)
 #     self.q_batch_value = tf.identity(q_val_batch, name=self.prefix + "q_batch_value")
   
-  def perform_policy(self, s_batch, a_batch, a_segment_batch):
+  def compute_next_policy_q_values(self, s_batch, a_batch, a_segment_batch, r_branch_id_batch, r_segment_batch):
 #     actions_batch_embeds = tf.transpose(policy_actions_batch, perm=[1, 0, 2])
 #      
 #     def action_loop_cond(i, i_len, *_):
@@ -219,16 +241,57 @@ class DeepQ():
 #       actions_q_batch_value = tf.concat([actions_q_batch_value, q_batch_value], axis=0)
 #       return i+1, i_len, actions_q_batch_value
     
-    q_val_batch = self.compute_q_value(s_batch, a_batch, a_segment_batch)
+    q_val_batch = self.compute_q_value(s_batch, a_batch, a_segment_batch, r_branch_id_batch, r_segment_batch)
     
-    def select_action(x):
-      start, end = x
-      part = tf.slice(q_val_batch, [start], [end-start])
-      return start+tf.argmax(part, axis=0, output_type=int_type)
+    def s_itr_cond(i, i_len, *_):
+      return tf.less(i, i_len)
     
-    start_a_segment_batch = tf.concat([[0], tf.slice(a_segment_batch, [0], [tf.shape(a_segment_batch)[-1]-1])], axis=0)
-    selected_actions = tf.map_fn(select_action, [start_a_segment_batch, a_segment_batch], (int_type))
-    return selected_actions
+    def s_itr_body(i, i_len, accumulated_base, a_seg_start, r_seg_start, next_policy_q_vs):
+      a_seg_end = a_segment_batch[i]
+      r_seg_end = r_segment_batch[i]
+      a_size = a_seg_end-a_seg_start
+      r_size = r_seg_end-r_seg_start
+      
+      def r_itr_cond(r, r_len, *_):
+        return tf.less(r, r_len)
+      
+      def r_itr_body(r, r_len, r_policy_q_vs):
+        
+        def a_itr_cond(a, a_len, *_):
+          return tf.less(a, a_len)
+        
+        def a_itr_body(a, a_len, a_q_vs):
+          a_q_vs = tf.concat([a_q_vs, [q_val_batch[accumulated_base+r+a*r_size]]], axis=0)
+          return a+1, a_len, a_q_vs
+        
+        a_q_vs = tf.zeros([0], float_type)
+        _, _, a_q_vs = tf.while_loop(a_itr_cond, a_itr_body, [tf.constant(0, int_type), a_seg_end-a_seg_start, a_q_vs])
+        max_a_q = tf.reduce_max(a_q_vs)
+        r_policy_q_vs = tf.concat([r_policy_q_vs, [max_a_q]], axis=0)
+        return r+1, r_len, r_policy_q_vs
+        
+      accumulated_base = accumulated_base + a_size * r_size
+      r_policy_q_vs = tf.zeros([0], float_type)
+      _, _, r_policy_q_vs = tf.while_loop(r_itr_cond, r_itr_body, [tf.constant(0, int_type), r_seg_end-r_seg_start, r_policy_q_vs], [tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape([None])])
+      next_policy_q_vs = tf.concat([next_policy_q_vs, r_policy_q_vs], axis=0)
+      return i+1, i_len, accumulated_base, a_seg_end, r_seg_end, next_policy_q_vs
+    
+    i = tf.constant(0, int_type)
+    i_len = tf.shape(a_segment_batch)[-1]
+    accumulated_base = tf.constant(0, int_type)
+    a_seg_start = tf.constant(0, int_type)
+    r_seg_start = tf.constant(0, int_type)
+    next_policy_q_vs = tf.zeros([0], float_type)
+    _, _, _, _, next_policy_q_vs = tf.while_loop(s_itr_cond, s_itr_body, [i, i_len, accumulated_base, a_seg_start, r_seg_start, next_policy_q_vs], [tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape([None])])
+#   
+#     def select_action(x):
+#       start, end = x
+#       part = tf.slice(q_val_batch, [start], [end - start])
+#       return start + tf.argmax(part, axis=0, output_type=int_type)
+#   
+#     start_a_segment_batch = tf.concat([[0], tf.slice(a_segment_batch, [0], [tf.shape(a_segment_batch)[-1] - 1])], axis=0)
+#     selected_actions = tf.map_fn(select_action, [start_a_segment_batch, a_segment_batch], (int_type))
+    return next_policy_q_vs
   
 #     i = tf.constant(0, int_type)
 #     batch_size = tf.shape(policy_actions_batch)[0]
@@ -245,6 +308,7 @@ class DeepQ():
 #     
 #   def get_output_node_names(self):
 #     return [self.prefix + "q_batch_value"]#, self.prefix + "selected_actions"
+
 
 class QLearn():
   
@@ -271,7 +335,8 @@ class QLearn():
     self.s_t_segment_batch = tf.placeholder(int_type, [None], "s_t_segment_batch")
     self.a_t_batch = tf.placeholder(int_type, [2, None], "a_t_batch")
     self.a_t_segment_batch = tf.placeholder(int_type, [None], "a_t_segment_batch")
-    self.r_t_batch = tf.placeholder(float_type, [None], "r_t_batch")
+    self.r_t_batch = tf.placeholder(float_type, [2, None], "r_t_batch")
+    self.r_t_segment_batch = tf.placeholder(int_type, [None], "r_t_segment_batch")
     self.s_t_1_batch = tf.placeholder(int_type, [2, None], "s_t_1_batch")
     self.s_t_1_segment_batch = tf.placeholder(int_type, [None], "s_t_1_segment_batch")
     self.s_t_1_actions_batch = tf.placeholder(int_type, [2, None], "s_t_1_actions_batch")
@@ -287,14 +352,12 @@ class QLearn():
   
   def learning(self):
     s_t_1_embed_batch, a_t_1_embed_batch, a_t_1_embed_segment_batch = self.embed_computer.compute_states_actions_embed(self.s_t_1_batch, self.s_t_1_segment_batch, self.s_t_1_actions_batch, self.s_t_1_actions_segment_batch)
-    selected_actions = self.target_action_value.perform_policy(s_t_1_embed_batch, a_t_1_embed_batch, a_t_1_embed_segment_batch)
-    
-    def select_action(select_data):
-      return tf.squeeze(a_t_1_embed_batch[select_data])
-    
-    selected_action_embeds = tf.map_fn(select_action, [selected_actions], dtype=(float_type))
-    y_batch = self.r_t_batch + gamma * self.target_action_value.compute_q_value(s_t_1_embed_batch, selected_action_embeds, tf.range(1, tf.shape(s_t_1_embed_batch)[0]+1))
-    
+    next_policy_q_values = self.target_action_value.compute_next_policy_q_values(s_t_1_embed_batch, a_t_1_embed_batch, a_t_1_embed_segment_batch, self.r_t_batch[0], self.r_t_segment_batch)
+#     def select_action(select_data):
+#       return tf.squeeze(a_t_1_embed_batch[select_data])
+#     selected_action_embeds = tf.map_fn(select_action, [selected_actions], dtype=(float_type))
+    y_batch = self.r_t_batch[1] + gamma * next_policy_q_values
+#     self.target_action_value.compute_q_value(s_t_1_embed_batch, selected_action_embeds, tf.range(1, tf.shape(s_t_1_embed_batch)[0] + 1))
     s_t_embed_batch, a_t_embed_batch, a_t_embed_segment_batch = self.embed_computer.compute_states_actions_embed(self.s_t_batch, self.s_t_segment_batch, self.a_t_batch, self.a_t_segment_batch)
     action_value_q_vals = self.action_value.compute_q_value(s_t_embed_batch, a_t_embed_batch, a_t_embed_segment_batch)
     self.loss = tf.reduce_sum(tf.squared_difference(y_batch, action_value_q_vals), name="q_learning_loss")
@@ -308,6 +371,7 @@ class QLearn():
       self.a_t_batch : input_data["a_t_batch"],
       self.a_t_segment_batch : input_data["a_t_segment_batch"],
       self.r_t_batch : input_data["r_t_batch"],
+      self.r_t_segment_batch : input_data["r_t_segment_batch"],
       self.s_t_1_batch : input_data["s_t_1_batch"],
       self.s_t_1_segment_batch : input_data["s_t_1_segment_batch"],
       self.s_t_1_actions_batch : input_data["s_t_1_actions_batch"],
@@ -322,7 +386,7 @@ class QLearn():
   
 
 def recv_basic(the_socket):
-  total_data=[]
+  total_data = []
   while True:
     data = the_socket.recv(1024)    
     if not data: break
@@ -366,7 +430,7 @@ if __name__ == '__main__':
 #     with tf.gfile.FastGFile('refined_deep_q.pb', mode='wb') as f:
 #       f.write(output_graph_def.SerializeToString())
     address = ('127.0.0.1', 31500)
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # s = socket.socket()
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # s = socket.socket()
     s.bind(address)
     s.listen(5)
     while True:
