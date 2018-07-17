@@ -324,6 +324,8 @@ class QLearn():
     DenseObjectMatrix1D s_t_segment_batch = new DenseObjectMatrix1D(0);
     DenseObjectMatrix2D a_t_batch = new DenseObjectMatrix2D(2,0);
     DenseObjectMatrix1D a_t_segment_batch = new DenseObjectMatrix1D(0);
+    DenseObjectMatrix1D r_t_branch_batch = new DenseObjectMatrix1D(0);
+    DenseObjectMatrix1D r_t_segment_batch = new DenseObjectMatrix1D(0);
     DenseObjectMatrix1D r_t_batch = new DenseObjectMatrix1D(0);
     DenseObjectMatrix2D s_t_1_batch = new DenseObjectMatrix2D(2,0);
     DenseObjectMatrix1D s_t_1_segment_batch = new DenseObjectMatrix1D(0);
@@ -335,32 +337,64 @@ class QLearn():
     self.s_t_segment_batch = tf.placeholder(int_type, [None], "s_t_segment_batch")
     self.a_t_batch = tf.placeholder(int_type, [2, None], "a_t_batch")
     self.a_t_segment_batch = tf.placeholder(int_type, [None], "a_t_segment_batch")
-    self.r_t_batch = tf.placeholder(float_type, [2, None], "r_t_batch")
+    self.r_t_branch_batch = tf.placeholder(int_type, [None], "r_t_branch_batch")
     self.r_t_segment_batch = tf.placeholder(int_type, [None], "r_t_segment_batch")
+    '''
+    the data above this note is also used for predicting
+    '''
+    self.r_t_batch = tf.placeholder(float_type, [None], "r_t_batch")
     self.s_t_1_batch = tf.placeholder(int_type, [2, None], "s_t_1_batch")
     self.s_t_1_segment_batch = tf.placeholder(int_type, [None], "s_t_1_segment_batch")
     self.s_t_1_actions_batch = tf.placeholder(int_type, [2, None], "s_t_1_actions_batch")
     self.s_t_1_actions_segment_batch = tf.placeholder(int_type, [None], "s_t_1_actions_segment_batch")
     
   def predicting(self):
-    # TODO
-    pass
+    s_t_embed_batch, a_t_embed_batch, a_t_embed_segment_batch = self.embed_computer.compute_states_actions_embed(self.s_t_batch, self.s_t_segment_batch, self.a_t_batch, self.a_t_segment_batch)
+    self.predicted_q_values = self.action_value.compute_q_value(s_t_embed_batch, a_t_embed_batch, a_t_embed_segment_batch, self.r_t_branch_batch, self.r_t_segment_batch)
   
   def predicting_with_input(self, input_data):
-    # TODO
-    pass
-  
+    feed_dict = {
+      self.s_t_batch : input_data["s_t_batch"],
+      self.s_t_segment_batch : input_data["s_t_segment_batch"],
+      self.a_t_batch : input_data["a_t_batch"],
+      self.a_t_segment_batch : input_data["a_t_segment_batch"],
+      self.r_t_branch_batch : input_data["r_t_branch_batch"],
+      self.r_t_segment_batch : input_data["r_t_segment_batch"],
+    }
+    predicted_q_values = self.sess.run([self.predicted_q_values], feed_dict=feed_dict)
+    predicted_q_values = predicted_q_values[0]
+    output_data = {}
+    a_start = 0
+    r_start = 0
+    accumulated_base = 0
+    for s in range(len(input_data["s_t_segment_batch"])):
+      a_end = input_data["a_t_segment_batch"][s]
+      r_end = input_data["r_t_segment_batch"][s]
+      a_length = a_end - a_start
+      r_length = r_end - r_start
+      s_data = {}
+      output_data[str(s)] = s_data
+      for r in range(r_length):
+        a_data = []
+        s_data[str(r)] = a_data
+        for a in range(a_length):
+          a_data.append(predicted_q_values[accumulated_base+r+a*r_length])
+      a_start = a_end
+      r_start = r_end
+      accumulated_base = accumulated_base + a_length * r_length
+    return output_data
+    
   def learning(self):
     s_t_1_embed_batch, a_t_1_embed_batch, a_t_1_embed_segment_batch = self.embed_computer.compute_states_actions_embed(self.s_t_1_batch, self.s_t_1_segment_batch, self.s_t_1_actions_batch, self.s_t_1_actions_segment_batch)
-    next_policy_q_values = self.target_action_value.compute_next_policy_q_values(s_t_1_embed_batch, a_t_1_embed_batch, a_t_1_embed_segment_batch, self.r_t_batch[0], self.r_t_segment_batch)
+    next_policy_q_values = self.target_action_value.compute_next_policy_q_values(s_t_1_embed_batch, a_t_1_embed_batch, a_t_1_embed_segment_batch, self.r_t_branch_batch, self.r_t_segment_batch)
 #     def select_action(select_data):
 #       return tf.squeeze(a_t_1_embed_batch[select_data])
 #     selected_action_embeds = tf.map_fn(select_action, [selected_actions], dtype=(float_type))
-    y_batch = self.r_t_batch[1] + gamma * next_policy_q_values
+    y_batch = self.r_t_batch + gamma * next_policy_q_values
 #     self.target_action_value.compute_q_value(s_t_1_embed_batch, selected_action_embeds, tf.range(1, tf.shape(s_t_1_embed_batch)[0] + 1))
-    s_t_embed_batch, a_t_embed_batch, a_t_embed_segment_batch = self.embed_computer.compute_states_actions_embed(self.s_t_batch, self.s_t_segment_batch, self.a_t_batch, self.a_t_segment_batch)
-    action_value_q_vals = self.action_value.compute_q_value(s_t_embed_batch, a_t_embed_batch, a_t_embed_segment_batch)
-    self.loss = tf.reduce_sum(tf.squared_difference(y_batch, action_value_q_vals), name="q_learning_loss")
+#     s_t_embed_batch, a_t_embed_batch, a_t_embed_segment_batch = self.embed_computer.compute_states_actions_embed(self.s_t_batch, self.s_t_segment_batch, self.a_t_batch, self.a_t_segment_batch)
+#     action_value_q_vals = self.action_value.compute_q_value(s_t_embed_batch, a_t_embed_batch, a_t_embed_segment_batch, self.r_t_branch_batch, self.r_t_segment_batch)
+    self.loss = tf.reduce_sum(tf.squared_difference(y_batch, self.predicted_q_values), name="q_learning_loss")
 #     tf.losses.mean_squared_error()
     self.train = self.adam.minimize(self.loss, name="q_learning_train")
     
@@ -370,8 +404,9 @@ class QLearn():
       self.s_t_segment_batch : input_data["s_t_segment_batch"],
       self.a_t_batch : input_data["a_t_batch"],
       self.a_t_segment_batch : input_data["a_t_segment_batch"],
-      self.r_t_batch : input_data["r_t_batch"],
+      self.r_t_branch_batch : input_data["r_t_branch_batch"],
       self.r_t_segment_batch : input_data["r_t_segment_batch"],
+      self.r_t_batch : input_data["r_t_batch"],
       self.s_t_1_batch : input_data["s_t_1_batch"],
       self.s_t_1_segment_batch : input_data["s_t_1_segment_batch"],
       self.s_t_1_actions_batch : input_data["s_t_1_actions_batch"],
@@ -417,6 +452,7 @@ if __name__ == '__main__':
 #     target_action_value.compute_q_value()
 #     target_action_value.perform_policy()
     q_learn = QLearn(sess, action_value, target_action_value)
+    q_learn.predicting()
     q_learn.learning()
     '''
     write model to file
