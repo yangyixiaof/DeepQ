@@ -374,11 +374,11 @@ class QLearn():
       r_length = r_end - r_start
       s_data = {}
       output_data[str(s)] = s_data
-      for r in range(r_length):
-        a_data = []
-        s_data[str(r)] = a_data
-        for a in range(a_length):
-          a_data.append(predicted_q_values[accumulated_base+r+a*r_length])
+      for a in range(a_length):
+        r_data = []
+        s_data[str(a)] = r_data
+        for r in range(r_length):
+          r_data.append(predicted_q_values[accumulated_base+r+a*r_length])
       a_start = a_end
       r_start = r_end
       accumulated_base = accumulated_base + a_length * r_length
