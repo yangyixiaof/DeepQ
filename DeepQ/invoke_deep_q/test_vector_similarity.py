@@ -9,3 +9,4 @@ a_norm = tf.nn.l2_normalize(a)
 sess = tf.InteractiveSession()
 print(sess.run([tf.tensordot(a_norm, b_norm, axes=1), tf.tensordot(a_norm, c_norm, axes=1)]))
 sess.close()
+
