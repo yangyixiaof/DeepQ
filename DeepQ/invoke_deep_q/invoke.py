@@ -265,7 +265,7 @@ class DeepQ():
           return a+1, a_len, a_q_vs
         
         a_q_vs = tf.zeros([0], float_type)
-        _, _, a_q_vs = tf.while_loop(a_itr_cond, a_itr_body, [tf.constant(0, int_type), a_seg_end-a_seg_start, a_q_vs])
+        _, _, a_q_vs = tf.while_loop(a_itr_cond, a_itr_body, [tf.constant(0, int_type), a_seg_end-a_seg_start, a_q_vs], shape_invariants=[tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape([None])])
         max_a_q = tf.reduce_max(a_q_vs)
         r_policy_q_vs = tf.concat([r_policy_q_vs, [max_a_q]], axis=0)
         return r+1, r_len, r_policy_q_vs
