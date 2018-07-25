@@ -282,7 +282,7 @@ class DeepQ():
     a_seg_start = tf.constant(0, int_type)
     r_seg_start = tf.constant(0, int_type)
     next_policy_q_vs = tf.zeros([0], float_type)
-    _, _, _, _, next_policy_q_vs = tf.while_loop(s_itr_cond, s_itr_body, [i, i_len, accumulated_base, a_seg_start, r_seg_start, next_policy_q_vs], [tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape([None])])
+    _, _, _, _, _, next_policy_q_vs = tf.while_loop(s_itr_cond, s_itr_body, [i, i_len, accumulated_base, a_seg_start, r_seg_start, next_policy_q_vs], [tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape([None])])
 #   
 #     def select_action(x):
 #       start, end = x
